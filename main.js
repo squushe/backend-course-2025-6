@@ -76,6 +76,10 @@ app.post("/register", upload.single("photo"), (req, res) => {
   res.status(201).json(newInventory);
 });
 
+app.all("/register", (req, res) => {
+  res.status(405).json({ message: "Method Not Allowed" });
+});
+
 app.get("/inventory", (req, res) => {
   const allItems = readData();
   const itemsWithLinks = allItems.map((item) => {
@@ -89,6 +93,9 @@ app.get("/inventory", (req, res) => {
     };
   });
   res.status(200).json(itemsWithLinks);
+});
+app.all("/inventory", (req, res) => {
+  res.status(405).json({ message: "Method Not Allowed" });
 });
 
 app.get("/inventory/:id", (req, res) => {
@@ -131,6 +138,31 @@ app.put("/inventory/:id", (req, res) => {
   } else {
     res.status(404).json({ message: "Річ з таким ID не знайдено" });
   }
+});
+app.delete("/inventory/:id", (req, res) => {
+  const allItems = readData();
+  const id = req.params.id;
+  const findIndex = allItems.findIndex((item) => {
+    return item.id === id;
+  });
+
+  if (findIndex !== -1) {
+    const itemToDelete = allItems[findIndex];
+    if (itemToDelete.photo) {
+      const pathToPhoto = path.join(options.cache, itemToDelete.photo);
+      fs.unlinkSync(pathToPhoto);
+      console.log("Пов'язане фото видалено:", pathToPhoto);
+    }
+    allItems.splice(findIndex, 1);
+    writeData(allItems);
+    res.status(200).json({ message: "Річ успішно видалено" });
+  } else {
+    res.status(404).json({ message: "Річ з таким ID не знайдено" });
+  }
+});
+
+app.all("/inventory/:id", (req, res) => {
+  res.status(405).json({ message: "Method Not Allowed" });
 });
 
 app.get("/inventory/:id/photo", (req, res) => {
@@ -178,29 +210,33 @@ app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
     res.status(404).json({ message: "Річ з таким ID не знайдено" });
   }
 });
+app.all("/inventory/:id/photo", (req, res) => {
+  res.status(405).json({ message: "Method Not Allowed" });
+});
 
-app.delete("/inventory/:id", (req, res) => {
+app.post("/search", (req, res) => {
   const allItems = readData();
-  const id = req.params.id;
-  const findIndex = allItems.findIndex((item) => {
+  const { id, has_photo } = req.body;
+  const findItem = allItems.find((item) => {
     return item.id === id;
   });
-
-  if (findIndex !== -1) {
-    const itemToDelete = allItems[findIndex];
-    if (itemToDelete.photo) {
-      const pathToPhoto = path.join(options.cache, itemToDelete.photo);
-      fs.unlinkSync(pathToPhoto);
-      console.log("Пов'язане фото видалено:", photoPath);
+  if (findItem) {
+    let itemToSend = { ...findItem };
+    if (has_photo && itemToSend.photo) {
+      const photoUrl = `${req.protocol}://${req.get("host")}/inventory/${
+        itemToSend.id
+      }/photo`;
+      itemToSend.description = `${itemToSend.description}\nПосилання на фото: ${photoUrl}`;
     }
-    allItems.splice(findIndex, 1);
-    writeData(allItems);
-    res.status(200).json({ message: "Річ успішно видалено" });
+    res.status(200).json(itemToSend);
   } else {
     res.status(404).json({ message: "Річ з таким ID не знайдено" });
   }
 });
 
+app.all("/search", (req, res) => {
+  res.status(405).json({ message: "Method Not Allowed" });
+});
 app.listen(options.port, options.host, () => {
   console.log(`Server running at http://${options.host}:${options.port}`);
 });
