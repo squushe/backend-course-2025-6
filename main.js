@@ -155,6 +155,30 @@ app.get("/inventory/:id/photo", (req, res) => {
   }
 });
 
+app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
+  const allItems = readData();
+  const id = req.params.id;
+  if (!req.file) {
+    return res.status(400).json({ message: "Файл фото не було завантажено" });
+  }
+  const findIndex = allItems.findIndex((item) => {
+    return item.id === id;
+  });
+  if (findIndex !== -1) {
+    const oldPhotoName = allItems[findIndex].photo;
+    if (oldPhotoName) {
+      const oldPhotoPath = path.join(options.cache, oldPhotoName);
+      fs.unlinkSync(oldPhotoPath);
+      console.log("Старе фото було видалено:", oldPhotoPath);
+    }
+    allItems[findIndex].photo = req.file.filename;
+    writeData(allItems);
+    res.status(200).json(allItems[findIndex]);
+  } else {
+    res.status(404).json({ message: "Річ з таким ID не знайдено" });
+  }
+});
+
 app.listen(options.port, options.host, () => {
   console.log(`Server running at http://${options.host}:${options.port}`);
 });
