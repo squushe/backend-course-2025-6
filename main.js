@@ -179,6 +179,28 @@ app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
   }
 });
 
+app.delete("/inventory/:id", (req, res) => {
+  const allItems = readData();
+  const id = req.params.id;
+  const findIndex = allItems.findIndex((item) => {
+    return item.id === id;
+  });
+
+  if (findIndex !== -1) {
+    const itemToDelete = allItems[findIndex];
+    if (itemToDelete.photo) {
+      const pathToPhoto = path.join(options.cache, itemToDelete.photo);
+      fs.unlinkSync(pathToPhoto);
+      console.log("Пов'язане фото видалено:", photoPath);
+    }
+    allItems.splice(findIndex, 1);
+    writeData(allItems);
+    res.status(200).json({ message: "Річ успішно видалено" });
+  } else {
+    res.status(404).json({ message: "Річ з таким ID не знайдено" });
+  }
+});
+
 app.listen(options.port, options.host, () => {
   console.log(`Server running at http://${options.host}:${options.port}`);
 });
