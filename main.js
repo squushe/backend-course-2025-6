@@ -110,6 +110,29 @@ app.get("/inventory/:id", (req, res) => {
   }
 });
 
+app.put("/inventory/:id", (req, res) => {
+  const allItems = readData();
+  const id = req.params.id;
+  const { inventory_name, description } = req.body;
+
+  const findIndex = allItems.findIndex((item) => {
+    return item.id === id;
+  });
+
+  if (findIndex !== -1) {
+    if (inventory_name) {
+      allItems[findIndex].inventory_name = inventory_name;
+    }
+    if (description) {
+      allItems[findIndex].description = description;
+    }
+    writeData(allItems);
+    res.status(200).json(allItems[findIndex]);
+  } else {
+    res.status(404).json({ message: "Річ з таким ID не знайдено" });
+  }
+});
+
 app.listen(options.port, options.host, () => {
   console.log(`Server running at http://${options.host}:${options.port}`);
 });
