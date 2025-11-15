@@ -1,6 +1,9 @@
 const { program } = require("commander");
-const http = require("http");
 const fs = require("fs");
+const express = require("express");
+const multer = require("multer");
+const path = require("path");
+const { v4: uuidv4 } = require("uuid");
 
 program
   .requiredOption("-H, --host <host>")
@@ -9,12 +12,104 @@ program
 
 program.parse();
 const options = program.opts();
+const app = express();
+const port = options.port;
+
+app.use(express.static(path.join(__dirname, "public")));
 
 if (!fs.existsSync(options.cache)) {
   fs.mkdirSync(options.cache, { recursive: true });
   console.log("Директорію створено");
 }
 
-let server = http.createServer((req, res) => {});
+const dbPath = path.join(options.cache, "data.json");
 
-server.listen(options.port, options.host);
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, options.cache);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+    );
+  },
+});
+
+const upload = multer({ storage: storage });
+
+function readData() {
+  if (!fs.existsSync(dbPath)) return [];
+  const data = fs.readFileSync(dbPath);
+  return JSON.parse(data);
+}
+
+function writeData(data) {
+  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+}
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.post("/register", upload.single("photo"), (req, res) => {
+  const { inventory_name, description } = req.body;
+
+  if (!inventory_name) {
+    return res
+      .status(400)
+      .json({ message: "Поле inventory_name є обов'язковим" });
+  }
+
+  const inventories = readData();
+
+  const newInventory = {
+    id: uuidv4(),
+    inventory_name: inventory_name,
+    description: description || "",
+    photo: req.file ? req.file.filename : null,
+  };
+
+  inventories.push(newInventory);
+  writeData(inventories);
+
+  res.status(201).json(newInventory);
+});
+
+app.get("/inventory", (req, res) => {
+  const allItems = readData();
+  const itemsWithLinks = allItems.map((item) => {
+    return {
+      id: item.id,
+      inventory_name: item.inventory_name,
+      description: item.description,
+      photo_url: item.photo
+        ? `${req.protocol}://${req.get("host")}/inventory/${item.id}/photo`
+        : null,
+    };
+  });
+  res.status(200).json(itemsWithLinks);
+});
+
+app.get("/inventory/:id", (req, res) => {
+  const allItems = readData();
+  id = req.params.id;
+  const findItem = allItems.find((item) => {
+    return item.id === id;
+  });
+  if (findItem) {
+    const itemWithLink = {
+      ...findItem,
+      photo_url: findItem.photo
+        ? `${req.protocol}://${req.get("host")}/inventory/${findItem.id}/photo`
+        : null,
+    };
+    res.status(200).json(itemWithLink);
+  } else {
+    res.status(404).json({ message: "Річ з таким ID не знайдено" });
+  }
+});
+
+app.listen(options.port, options.host, () => {
+  console.log(`Server running at http://${options.host}:${options.port}`);
+});
