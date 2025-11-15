@@ -133,6 +133,28 @@ app.put("/inventory/:id", (req, res) => {
   }
 });
 
+app.get("/inventory/:id/photo", (req, res) => {
+  const allItems = readData();
+  const id = req.params.id;
+  const findItem = allItems.find((item) => {
+    return item.id === id;
+  });
+  if (findItem) {
+    if (findItem.photo) {
+      const photoPath = path.join(options.cache, findItem.photo);
+      if (fs.existsSync(photoPath)) {
+        res.sendFile(photoPath);
+      } else {
+        res.status(404).json({ message: "Немає фото" });
+      }
+    } else {
+      res.status(404).json({ message: "Не було завантажено фото" });
+    }
+  } else {
+    res.status(404).json({ message: "Річ з таким ID не знайдено" });
+  }
+});
+
 app.listen(options.port, options.host, () => {
   console.log(`Server running at http://${options.host}:${options.port}`);
 });
