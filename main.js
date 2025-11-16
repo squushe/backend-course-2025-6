@@ -4,6 +4,8 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const swaggerJsDoc = require("swagger-jsdoc");
+const swaggerUi = require("swagger-ui-express");
 
 program
   .requiredOption("-H, --host <host>")
@@ -52,6 +54,57 @@ function writeData(data) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Конфігурація Swagger
+const swaggerOptions = {
+  swaggerDefinition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Inventory Service API",
+      version: "1.0.0",
+      description: "API for invetory service",
+    },
+    servers: [
+      {
+        url: `http://${options.host}:${options.port}`,
+      },
+    ],
+  },
+  apis: ["./main.js"],
+};
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+/**
+ * @swagger
+ * /register:
+ *   post:
+ *     summary: Register a new inventory item
+ *     tags: [Inventory]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               inventory_name:
+ *                 type: string
+ *                 description: The name of the item (required).
+ *               description:
+ *                 type: string
+ *                 description: A description of the item.
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: The item's photo file.
+ *     responses:
+ *       201:
+ *         description: Item created successfully.
+ *       400:
+ *         description: Bad request, inventory_name is required.
+ */
+
 app.post("/register", upload.single("photo"), (req, res) => {
   const { inventory_name, description } = req.body;
 
@@ -80,6 +133,33 @@ app.all("/register", (req, res) => {
   res.status(405).json({ message: "Method Not Allowed" });
 });
 
+/**
+ * @swagger
+ * /inventory:
+ *   get:
+ *     summary: Retrieve a list of all inventory items
+ *     tags: [Inventory]
+ *     responses:
+ *       200:
+ *         description: A list of inventory items.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                   inventory_name:
+ *                     type: string
+ *                   description:
+ *                     type: string
+ *                   photo_url:
+ *                     type: string
+ *                     format: uri
+ */
+
 app.get("/inventory", (req, res) => {
   const allItems = readData();
   const itemsWithLinks = allItems.map((item) => {
@@ -97,6 +177,26 @@ app.get("/inventory", (req, res) => {
 app.all("/inventory", (req, res) => {
   res.status(405).json({ message: "Method Not Allowed" });
 });
+
+/**
+ * @swagger
+ * /inventory/{id}:
+ *   get:
+ *     summary: Get a single inventory item by ID
+ *     tags: [Inventory]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The unique ID of the item.
+ *     responses:
+ *       200:
+ *         description: The inventory item details.
+ *       404:
+ *         description: Item with the specified ID not found.
+ */
 
 app.get("/inventory/:id", (req, res) => {
   const allItems = readData();
@@ -116,6 +216,36 @@ app.get("/inventory/:id", (req, res) => {
     res.status(404).json({ message: "Річ з таким ID не знайдено" });
   }
 });
+
+/**
+ * @swagger
+ * /inventory/{id}:
+ *   put:
+ *     summary: Update an item's name or description
+ *     tags: [Inventory]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The unique ID of the item.
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               inventory_name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Item updated successfully.
+ *       404:
+ *         description: Item with the specified ID not found.
+ */
 
 app.put("/inventory/:id", (req, res) => {
   const allItems = readData();
@@ -139,6 +269,27 @@ app.put("/inventory/:id", (req, res) => {
     res.status(404).json({ message: "Річ з таким ID не знайдено" });
   }
 });
+
+/**
+ * @swagger
+ * /inventory/{id}:
+ *   delete:
+ *     summary: Delete an inventory item by ID
+ *     tags: [Inventory]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The unique ID of the item to delete.
+ *     responses:
+ *       200:
+ *         description: Item deleted successfully.
+ *       404:
+ *         description: Item with the specified ID not found.
+ */
+
 app.delete("/inventory/:id", (req, res) => {
   const allItems = readData();
   const id = req.params.id;
@@ -165,6 +316,31 @@ app.all("/inventory/:id", (req, res) => {
   res.status(405).json({ message: "Method Not Allowed" });
 });
 
+/**
+ * @swagger
+ * /inventory/{id}/photo:
+ *   get:
+ *     summary: Get the photo of a specific item
+ *     tags: [Inventory]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The unique ID of the item.
+ *     responses:
+ *       200:
+ *         description: The item's photo file.
+ *         content:
+ *           image/jpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Item or photo not found.
+ */
+
 app.get("/inventory/:id/photo", (req, res) => {
   const allItems = readData();
   const id = req.params.id;
@@ -186,6 +362,39 @@ app.get("/inventory/:id/photo", (req, res) => {
     res.status(404).json({ message: "Річ з таким ID не знайдено" });
   }
 });
+
+/**
+ * @swagger
+ * /inventory/{id}/photo:
+ *   put:
+ *     summary: Update the photo of a specific item
+ *     tags: [Inventory]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The unique ID of the item.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: The new photo file.
+ *     responses:
+ *       200:
+ *         description: Photo updated successfully.
+ *       400:
+ *         description: No photo file uploaded.
+ *       404:
+ *         description: Item with the specified ID not found.
+ */
 
 app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
   const allItems = readData();
@@ -213,6 +422,32 @@ app.put("/inventory/:id/photo", upload.single("photo"), (req, res) => {
 app.all("/inventory/:id/photo", (req, res) => {
   res.status(405).json({ message: "Method Not Allowed" });
 });
+
+/**
+ * @swagger
+ * /search:
+ *   post:
+ *     summary: Search for an item by its ID
+ *     tags: [Inventory]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: The ID of the item to find.
+ *               has_photo:
+ *                 type: boolean
+ *                 description: If checked, appends the photo URL to the description.
+ *     responses:
+ *       200:
+ *         description: The found item's information.
+ *       404:
+ *         description: Item with the specified ID not found.
+ */
 
 app.post("/search", (req, res) => {
   const allItems = readData();
