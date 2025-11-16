@@ -173,7 +173,7 @@ app.get("/inventory/:id/photo", (req, res) => {
   });
   if (findItem) {
     if (findItem.photo) {
-      const photoPath = path.join(options.cache, findItem.photo);
+      const photoPath = path.join(__dirname, options.cache, findItem.photo);
       if (fs.existsSync(photoPath)) {
         res.sendFile(photoPath);
       } else {
